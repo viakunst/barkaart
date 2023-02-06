@@ -1,0 +1,18 @@
+<?php
+
+return [
+    // OpenID Connect
+    'oidc_provider' => 'https://id.provider.com',
+    'oidc_id' => 'ClientIDHere',
+    'oidc_secret' => 'ClientSecretHere',
+    // 'oidc_issuer' => 'https://id.provider.com',
+
+    // Database
+    'db_host' => 'localhost',
+    'db_name' => 'DatabaseNameHere',
+    'db_user' => 'DatabaseUserHere',
+    'db_pass' => 'DatabasePasswordHere',
+
+    // Signature secret
+    'secret' => 'Sup3rSECRET',
+];

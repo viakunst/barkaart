@@ -1,0 +1,13 @@
+{
+    "require": {
+        "symfony/config": "^6.2",
+        "symfony/http-kernel": "^6.2",
+        "symfony/http-foundation": "^6.2",
+        "symfony/routing": "^6.2",
+        "symfony/dependency-injection": "^6.2",
+        "symfony/framework-bundle": "^6.2",
+        "bacon/bacon-qr-code": "^2.0",
+        "doctrine/doctrine-bundle": "^2.8",
+        "jumbojett/openid-connect-php": "^0.9.10"
+    }
+}
