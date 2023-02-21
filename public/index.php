@@ -135,6 +135,27 @@ class Kernel extends BaseKernel
         return self::render('Succesvol uitgelogd!');
     }
 
+    // registers a range of codes
+    #[Route('/register/{prefix}/{value}/{max?99}/{min?0}', name: 'register')]
+    public function registerAction(string $prefix, int $value, int $max, int $min, Request $request): Response
+    {
+        $this->denyAccessUnlessGranted(Role::Admin, 'Alleen beheerders kunnen nieuwe kaarten registreren');
+
+        // Prepare params
+        $count = max(0, $max - $min + 1);
+        $params = [];
+        for ($i = $min; $i <= $max; $i++) {
+            $params = [...$params, $this->code($prefix, $i), $value];
+        }
+
+        // Prepare/execute query
+        $action = $request->query->has('override') ? 'REPLACE' : 'INSERT IGNORE'; 
+        $values = implode(', ', array_fill(0, $count, '(?, ?)'));
+        $this->query("$action INTO `registered_barkaart` (`code`, `value`) VALUES $values", $params);
+
+        return self::render($this->code($prefix, $min).' - '.$this->code($prefix, $max).' geregistreerd!');
+    }
+
     // validate a code and signature
     #[Route('/code/{code}', name: 'code')]
     public function codeAction(string $code, Request $request, SecurityProvider $security): Response
@@ -147,18 +168,8 @@ class Kernel extends BaseKernel
             default                                => [0, $security->verify($code, $sig)], // only A00-A99
         };
 
-        // register new barkaart if not present and properly authenticated
-        $registered = $this->retrieveRegistration($code);
-        if ($registered === null && $validSignature && $this->isAuthorized(Role::User)) {
-            $registered = [
-                'code' => $code,
-                'value' => $value ?? 50, // default value for A00-A99
-            ];
-            $this->query("INSERT INTO `registered_barkaart` (`code`, `value`) VALUES (:code, :value)", $registered);
-        }
-
         // always provide code for rendering purposes
-        if ($registered === null) {
+        if (null === $registered = $this->retrieveRegistration($code)) {
             $registered = ['code' => $code];
         }
 
@@ -262,8 +273,8 @@ class Kernel extends BaseKernel
     }
 
     // in all other cases, generate new cards
-    #[Route('/generate/{size}', name: 'generate')]
-    public function generateAction(int $size, SecurityProvider $security): Response
+    #[Route('/generate/{width}/{height}', name: 'generate')]
+    public function generateAction(SecurityProvider $security, int $width, int $height = 10): Response
     {
         $this->denyAccessUnlessGranted(Role::Admin);
 
@@ -273,20 +284,20 @@ class Kernel extends BaseKernel
             return self::render('Please provide a prefix');
         }
         
-        return self::render(function (int $size, string $prefix, SecurityProvider $security) {
+        return self::render(function (int $width, int $height, string $prefix, SecurityProvider $security) {
             foreach (range(0, 99) as $number) {
-                $code = $prefix.str_pad($number, 2, '0', STR_PAD_LEFT);
-                $value = $size * 10;
+                $code = $this->code($prefix, $number);
+                $value = $width * $height;
                 $sig = $security->sign("$code:$value.");
                 ?>
                 <div class="page">
                     <p class="header">ViaKunst barkaart - <?php echo $code; ?></p>
-                    <?php echo $this->generate_table($size, 10); ?>
+                    <?php echo $this->generate_table($width, $height); ?>
                     <div class="qr"><?php echo $this->generate_qr($code, $sig, $value); ?></div>
                 </div>
                 <?php
             }
-        }, ['size' => $size, 'prefix' => $prefix, 'security' => $security]);
+        }, ['width' => $width, 'height' => $height, 'prefix' => $prefix, 'security' => $security]);
     }
 
     private function routeTo(string $name, array $parameters = [], int $referenceType = RouterInterface::ABSOLUTE_URL): string
@@ -320,6 +331,11 @@ class Kernel extends BaseKernel
             if ($i % $width == 0) $content .= '</tr><tr>';
         }
         return '<table><tr>'.$content.'</tr></table>';
+    }
+
+    private function code(string $prefix, int $index): string
+    {
+        return strtoupper($prefix).str_pad($index, 2, '0', STR_PAD_LEFT);
     }
 
     private function isAuthorized(Role $role = Role::User): bool
